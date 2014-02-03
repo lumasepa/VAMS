@@ -1,6 +1,5 @@
 import 'dart:html';
 import 'dart:core';
-import 'binary.dart';
 import 'simulator.dart';
 
 void bnt_start_clicked(MouseEvent event)
