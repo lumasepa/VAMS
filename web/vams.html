@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>SimulationEngine</title>
+    <link rel="stylesheet" href="simulationengine.css">
+  </head>
+  <body>
+    <h1>SimulationEngine</h1>
+    
+    <input type="button" value="Start!" id="bnt_start">
+    <input type="button" value="Stop!" id="bnt_stop">
+    <input type="button" value="Step!" id="bnt_step">
+    
+    <textarea rows="50" cols="50" id="code_container">
+      ASM code
+    </textarea>
+    
+    <canvas id="machine_view"></canvas>
+
+    <script type="application/dart" src="simulationengine.dart"></script>
+    <script src="packages/browser/dart.js"></script>
+  </body>
+</html>
