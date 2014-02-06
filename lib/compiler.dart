@@ -1,50 +1,6 @@
-import 'dart:core';
 import 'binary.dart';
-import 'memory.dart';
 
-class ALU
-{
-  bool flag = true;
-  bool overflow = false;
-  
-  void operate(var sr1, var sr2, var dst, var op)
-  {
-    switch(op)
-    {
-      case 'XOR':
-        dst = sr1 ^ sr2;
-      break;
-      /* .
-       * .
-       * .
-       * .
-       */
-    }
-  }
-}
-
-
-class UC
-{
-     Binary exec(Binary instruction)
-     {
-     
-     }
-}
-
-class Machine
-{
-     Binary PC;
-     UC uc;
-     ALU alu;
-     RegBank regbank;
-     Memory memory;
-     Machine(){}
-     void init(){}
-     void start(){}
-}
-
-class Loader
+class Compiler
 {
     String text;
     var tipo_R = {"SLL":"00000000","SRL":"00000010","SRA":"00000011", "SRLV":"00000110", "SRAV":"00000111",
@@ -72,7 +28,7 @@ class Loader
                 "\$ra":"11111"};
      
     
-    Loader(this.text);
+    Compiler(this.text);
     
     bool isInt(String number)
     {
@@ -99,11 +55,14 @@ class Loader
          return true;
     }
     
-    List parse()
+    List compile()
     {
+      var Errors = new List<String>() ;
+      bool susceful = true;
+      var instructions = new List<Binary>() ;
       
-      List<Binary> intructions;
       List lines = text.split('\n');
+      
       var clean_lines = new List<String>();
 
       for(int i = 0; i < lines.length;i++)
@@ -125,7 +84,8 @@ class Loader
         {
              if(tags[clean_lines[i].split(' ')[0].replaceAll(new RegExp(":"),'')] != null)
              {
-                  print("Error in Code line : " + i.toString() + " Repeited tag in line " + tags[clean_lines[i].split(' ')[0].replaceAll(new RegExp(":"),'')].toString());
+                  susceful = false;
+                  Errors.add("Error in Code line : " + i.toString() + " Repeited tag in line " + tags[clean_lines[i].split(' ')[0].replaceAll(new RegExp(":"),'')].toString());
              }
              else
              {
@@ -146,13 +106,15 @@ class Loader
           var params = line[1].split(",");
           if(params.length != 3)
           {
-            print ("Error in Code line : " + i.toString() + " Invalid number of registers " + clean_lines[i]);
+            susceful = false;
+            Errors.add ("Error in Code line : " + i.toString() + " Invalid number of registers " + clean_lines[i]);
           }
           else if(regs[params[2].trim()] == null ||
              regs[params[1].trim()] == null ||
              regs[params[0].trim()] == null)
           {
-            print ("Error in Code line : " + i.toString() + " Register not valid " + clean_lines[i]);
+            susceful = false;
+            Errors.add ("Error in Code line : " + i.toString() + " Register not valid " + clean_lines[i]);
           }
           else
           {          
@@ -162,7 +124,7 @@ class Loader
                                                  regs[params[1].trim()] + 
                                                  regs[params[0].trim()] + 
                                                  tipo_R[line[0]]);
-               print(instruction.toStringfill());
+               instructions.add(instruction);
           }
         }
         else if (tipo_I[line[0]] != null)
@@ -170,16 +132,19 @@ class Loader
           var params = line[1].split(",");
           if(params.length != 3)
           {
-            print ("Error in Code line : " + i.toString() + " Invalid number of parameters " + clean_lines[i]);
+            susceful = false;
+            Errors.add ("Error in Code line : " + i.toString() + " Invalid number of parameters " + clean_lines[i]);
           } 
           else if(regs[params[0].trim()] == null ||
              regs[params[1].trim()] == null )
           {
-            print ("Error in Code line : " + i.toString() + " Register not valid " + clean_lines[i]);
+            susceful = false;
+            Errors.add ("Error in Code line : " + i.toString() + " Register not valid " + clean_lines[i]);
           }
           else if(!isInt(params[2].trim()) && tags[params[2].trim()] == null)
           {
-               print ("Error in Code line : " + i.toString() + " Tag not valid " + clean_lines[i]);
+               susceful = false;
+               Errors.add ("Error in Code line : " + i.toString() + " Tag not valid " + clean_lines[i]);
           }
           else
           {
@@ -202,18 +167,20 @@ class Loader
                               regs[params[0].trim()] +
                               inm.toStringfill());
                }
-               print(instruction.toStringfill());
+               instructions.add(instruction);
           }
         }
         else if (tipo_J[line[0]] != null)
         {
              if(line.length != 2)
              {
-                  print ("Error in Code line : " + i.toString() + " Invalid number of parameters " + clean_lines[i]);
+                  susceful = false;
+                  Errors.add ("Error in Code line : " + i.toString() + " Invalid number of parameters " + clean_lines[i]);
              } 
              else if(!isInt(line[1]))
              {
-                  print ("Error in Code line : " + i.toString() + " inmediate not valid " + clean_lines[i]);
+                  susceful = false;
+                  Errors.add ("Error in Code line : " + i.toString() + " inmediate not valid " + clean_lines[i]);
              }
              else
              { 
@@ -221,16 +188,24 @@ class Loader
                   var inm = new Binary(26);
                   inm.from_num(int.parse(line[1]));
                   instruction.fromString(tipo_J[line[0]] + inm.toStringfill());
-                  print(instruction.toStringfill());
+                  instructions.add(instruction);
              }
         }
         else
         {
-          print ("Error in Code line : " + i.toString() + " not a intruction " + clean_lines[i]);
+          susceful = false;
+          Errors.add ("Error in Code line : " + i.toString() + " not a instruction " + clean_lines[i]);
         }
         
           
       }
-      
+      if(susceful)
+      {
+           return instructions;
+      }
+      else
+      {
+           throw Errors;
+      }
     }
 }

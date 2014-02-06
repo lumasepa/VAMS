@@ -9,16 +9,14 @@
   <body>
     <h1>SimulationEngine</h1>
     
-    <input type="button" value="Start!" id="bnt_start">
-    <input type="button" value="Stop!" id="bnt_stop">
-    <input type="button" value="Step!" id="bnt_step">
+    <input type="button" value="Compile!" id="bnt_compile">
     
     <textarea rows="50" cols="50" id="code_container">
       ASM code
     </textarea>
     
     <canvas id="machine_view"></canvas>
-
+    <textarea id="log" rows="50" cols="50">Log</textarea>
     <script type="application/dart" src="vams.dart"></script>
     <script src="packages/browser/dart.js"></script>
   </body>
