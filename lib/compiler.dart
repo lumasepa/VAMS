@@ -3,8 +3,17 @@ import 'binary.dart';
 class Compiler
 {
     String text;
+    List lines;
+    var clean_lines;
+    var Errors;
+    var binary_exe;
+    var tags;
+    var susccessful;
+    int dir_data = -1;
+    int dir_text = -1;
+    
     var tipo_R = {"SLL":"00000000","SRL":"00000010","SRA":"00000011", "SRLV":"00000110", "SRAV":"00000111",
-                  "ADD":"00100000", "SLLV":"01000000","ADDU":"00100001", "SUB":"00100001","SUBU":"00100011",
+                  "add":"00100000", "SLLV":"01000000","ADDU":"00100001", "SUB":"00100001","SUBU":"00100011",
                   "AND":"00100100","OR":"00100101", "XOR":"00100110","NOR":"00100111", "SLT":"00101010",
                   "SLTU":"00101011","JR":"00001000"};
     
@@ -14,7 +23,7 @@ class Compiler
                   "LUI":"001111","SLTI":"001010","SLTIU":"001011", "BEQ":"000100",
                   "BNE":"000101"};
     
-    var tipo_J = {"J":"000010","JAL":"000011"};
+    var tipo_J = {"j":"000010","JAL":"000011"};
 
     var regs = {"\$zero":"00000","\$at":"00001","\$v0":"00010","\$v1":"00011",
                 "\$a0":"00100","\$a1":"00101","\$a2":"00110","\$a3":"00111",
@@ -28,7 +37,14 @@ class Compiler
                 "\$ra":"11111"};
      
     
-    Compiler(this.text);
+    Compiler(this.text)
+    {
+         lines = text.split('\n');
+         Errors = new List<String>() ;
+         binary_exe = new List<Binary>();
+         tags = new Map();
+         susccessful = true;
+    }
     
     bool isInt(String number)
     {
@@ -55,153 +71,369 @@ class Compiler
          return true;
     }
     
+    void delete_comentaries()
+    {
+         clean_lines = new List<String>();
+         
+         for(int i = 0; i < lines.length;i++)
+         {
+              lines[i] = lines[i].trim();
+              
+              if (lines[i].split('#')[0] != "")
+              {
+                   clean_lines.add(lines[i].split('#')[0]);
+              } 
+         }
+    }
+    
+    void  split_data_and_text()
+    {
+         for(int i = 0; i < clean_lines.length;i++)
+         {
+              clean_lines[i] = clean_lines[i].toLowerCase();
+              if(clean_lines[i].trim() == '.data')
+              {
+                   dir_data = i;
+                   clean_lines.removeAt(i);
+              }
+              else if(clean_lines[i].trim() == '.text')
+              {
+                   dir_text = i;
+                   clean_lines.removeAt(i);
+              }
+         }
+         if (dir_text == -1)
+         {
+              Errors.add(".text not found");
+              throw Errors;
+         }
+         if (dir_data > dir_text)
+         {
+              Errors.add(".data (" + dir_data.toString() + ")must be first to .text(" + dir_text.toString() + ")");
+              throw Errors;
+         }
+         if(dir_data > 0  )
+         {
+              Errors.add(".data must be first of the document");
+              throw Errors;
+         }
+    }
+    
+    int parse_tags(int ini,int end,int dsp)
+    { 
+         int deleted_lines = 0;
+         for(int i = ini; i < clean_lines.length;i++)
+         {
+              if(clean_lines[i].trim().startsWith(':'))
+              {
+                   if(tags[clean_lines[i].trim().split(' ')[0].replaceAll(new RegExp(":"),'')] != null)
+                   {
+                        susccessful = false;
+                        Errors.add("Error in Code line : " + i.toString() + " Repeited tag in line " + tags[clean_lines[i].split(' ')[0].replaceAll(new RegExp(":"),'')].toString());
+                   }
+                   else
+                   {
+                        tags[clean_lines[i].split(' ')[0].replaceAll(new RegExp(":"),'')] = i + dsp;
+                        // delete inicial tags form code
+                        clean_lines[i] = clean_lines[i].replaceAll(new RegExp(clean_lines[i].split(' ')[0]),'').trim();
+                        if(clean_lines[i] == "")
+                        {
+                             clean_lines.removeAt(i);
+                             deleted_lines--;
+                        }
+                   }
+              }
+         }
+         return deleted_lines;
+    }
+    int parse_data()
+    {
+         if(dir_data == -1)
+         {
+              return 0;
+         }
+         for(int i = dir_data; i < dir_text;i++)
+         {
+              if (clean_lines[i].trim().split(" ")[0].endsWith(':'))
+              {
+                   if(tags[clean_lines[i].trim().split(' ')[0].replaceAll(new RegExp(":"),'')] != null)
+                   {
+                        susccessful = false;
+                        Errors.add("Error in Code line : " + i.toString() + " Repeited tag in line " + tags[clean_lines[i].split(' ')[0].replaceAll(new RegExp(":"),'')].toString());
+                   }
+                   else
+                   {
+                        tags[clean_lines[i].trim().split(" ")[0].replaceAll(new RegExp(":"),'')] = binary_exe.length;
+                        switch(clean_lines[i].split(" ")[1])
+                        {
+                             case ".utf16":
+                                  var bin;
+                                  for (int j = 0; j < clean_lines[i].split(" ")[2].length;j + 2)
+                                  {
+                                       if(j + 1 < clean_lines[i].split(" ")[2].length)
+                                       {
+                                            int halfword1 = clean_lines[i].split(" ")[2].codeUnitAt(j);
+                                            int halfword2 = clean_lines[i].split(" ")[2].codeUnitAt(j+1) * 2^16;
+                                            bin = new Binary(32);
+                                            bin.from_num(halfword1+halfword2);
+                                            binary_exe.add(bin);
+                                       }
+                                       else
+                                       {
+                                            int halfword1 = clean_lines[i].split(" ")[1].codeUnitAt(j);
+                                            bin = new Binary(32);
+                                            bin.from_num(halfword1);
+                                            binary_exe.add(bin);
+                                       }
+                                       
+                                  }
+                                  break;
+                             case ".utf16z":
+                                  var bin;
+                                  bool end_zero = false;
+                                  for (int j = 0; j < clean_lines[i].split(" ")[2].length;j + 2)
+                                  {
+                                       if(j + 1 < clean_lines[i].split(" ")[2].length)
+                                       {
+                                            int halfword1 = clean_lines[i].split(" ")[2].codeUnitAt(j);
+                                            int halfword2 = clean_lines[i].split(" ")[2].codeUnitAt(j+1) * 2^16;
+                                            bin = new Binary(32);
+                                            bin.from_num(halfword1+halfword2);
+                                            binary_exe.add(bin);
+                                       }
+                                       else
+                                       {
+                                            int halfword1 = clean_lines[i].split(" ")[1].codeUnitAt(j);
+                                            bin = new Binary(32);
+                                            bin.from_num(halfword1);
+                                            binary_exe.add(bin);
+                                            end_zero = true;
+                                       }   
+                                  }
+                                  if(!end_zero)
+                                  {
+                                       bin = new Binary(32);
+                                       bin.from_num(0);
+                                       binary_exe.add(bin);
+                                  }
+                                  break;
+                             case ".byte":
+                                  var bin;
+                                  var byte = new List<Binary>();
+                                  for (int j = 2; j < clean_lines[i].split(" ").length; j = j + 4)
+                                  {
+                                       for(int k = 0; k < 4; k++)
+                                       {
+                                            if(j + k < clean_lines[i].split(" ").length)
+                                            {
+                                                  byte.add(new Binary(32).from_num(int.parse(clean_lines[i].split(" ")[j+k])));
+                                            }
+                                            else
+                                            {
+                                                 byte.add(new Binary(32).from_num(0));
+                                            }
+                                       }
+                                            
+                                            bin = (byte[0] << 24) | (byte[1] << 16) | (byte[2] << 8) | byte[3];
+                                            binary_exe.add(bin);
+                                            byte.clear();
+                                  }
+                                  
+                                  break;
+                             case ".halfword":
+                                  var bin;
+                                  for (int j = 2; j < clean_lines[i].split(" ").length; j = j + 2)
+                                  {
+                                       if(j + 1 < clean_lines[i].split(" ").length)
+                                       {
+                                            var halfword1 = new Binary(32).from_num(int.parse(clean_lines[i].split(" ")[j]));
+                                            var halfword2 = new Binary(32).from_num(int.parse(clean_lines[i].split(" ")[j+1]));
+                                            
+                                            bin = (halfword1 << 16) | halfword2;
+                                            binary_exe.add(bin);
+                                       }
+                                       else
+                                       {
+                                            bin = new Binary(32).from_num(int.parse(clean_lines[i].split(" ")[j]));
+                                            binary_exe.add(bin);
+                                       }   
+                                  }
+                                  break;
+                             case ".word":
+                                  var bin;
+                                  for (int j = 2; j < clean_lines[i].split(" ").length;j ++)
+                                  {
+                                            int word = int.parse(clean_lines[i].split(" ")[j]);
+                                            bin = new Binary(32);
+                                            bin.from_num(word);
+                                            binary_exe.add(bin);
+                                  }
+                                  break;
+                             case ".space":
+                                  var bin;
+                                  for (int j = 1; j < int.parse(clean_lines[i].split(" ")[2])/4;j ++)
+                                  {
+                                            bin = new Binary(32);
+                                            bin.from_num(0);
+                                            binary_exe.add(bin);
+                                  }
+                                  if(int.parse(clean_lines[i].split(" ")[2]) % 4 != 0)
+                                  {
+                                       bin = new Binary(32);
+                                       bin.from_num(0);
+                                       binary_exe.add(bin);
+                                  }
+                                  
+                                  break;
+                             default:
+                                  susccessful = false;
+                                  Errors.add("Error in Code line : " + i.toString() + "not a data type" + clean_lines[i].split(" ")[1]);
+                                  break;
+                        }
+                   }
+              }
+              else
+              {
+                   susccessful = false;
+                   Errors.add("Error in Code line : " + i.toString() + "not a valid label" + clean_lines[i].trim().split(" ")[1]);
+              }
+         }
+         return binary_exe.length;
+    }
+    void parse_text()
+    {
+         for(int i = dir_text; i < clean_lines.length;i++)
+         {
+              var line = clean_lines[i].split(' ');
+              if (tipo_R[line[0]] != null)
+              {
+                   var params = line[1].split(",");
+                   if(params.length != 3)
+                   {
+                        susccessful = false;
+                        Errors.add ("Error in Code line : " + i.toString() + " Invalid number of registers " + clean_lines[i]);
+                   }
+                   else if(regs[params[2].trim()] == null ||
+                             regs[params[1].trim()] == null ||
+                             regs[params[0].trim()] == null)
+                   {
+                        susccessful = false;
+                        Errors.add ("Error in Code line : " + i.toString() + " Register not valid " + clean_lines[i]);
+                   }
+                   else
+                   {          
+                        var instruction = new Binary(32);
+                        
+                        instruction.fromString("000000" + regs[params[2].trim()] + 
+                                  regs[params[1].trim()] + 
+                                  regs[params[0].trim()] + 
+                                  tipo_R[line[0]]);
+                        binary_exe.add(instruction);
+                   }
+              }
+              else if (tipo_I[line[0]] != null)
+              {
+                   var params = line[1].split(",");
+                   if(params.length != 3)
+                   {
+                        susccessful = false;
+                        Errors.add ("Error in Code line : " + i.toString() + " Invalid number of parameters " + clean_lines[i]);
+                   } 
+                   else if(regs[params[0].trim()] == null ||
+                             regs[params[1].trim()] == null )
+                   {
+                        susccessful = false;
+                        Errors.add ("Error in Code line : " + i.toString() + " Register not valid " + clean_lines[i]);
+                   }
+                   else if(!isInt(params[2].trim()) && tags[params[2].trim()] == null)
+                   {
+                        susccessful = false;
+                        Errors.add ("Error in Code line : " + i.toString() + " Tag not valid " + clean_lines[i]);
+                   }
+                   else
+                   {
+                        var instruction = new Binary(32);
+                        if(!isInt(params[2].trim()))
+                        {
+                             var tag = new Binary(16);
+                             tag.from_num(tags[params[2].trim()]);
+                             instruction.fromString(tipo_I[line[0]] +
+                                       regs[params[1].trim()] +
+                                       regs[params[0].trim()] +
+                                       tag.toStringfill());
+                        }
+                        else
+                        {
+                             var inm = new Binary(16);
+                             inm.from_num(int.parse(params[2].trim()));
+                             instruction.fromString(tipo_I[line[0]] +
+                                       regs[params[1].trim()] +
+                                       regs[params[0].trim()] +
+                                       inm.toStringfill());
+                        }
+                        binary_exe.add(instruction);
+                   }
+              }
+              else if (tipo_J[line[0]] != null)
+              {
+                   if(line.length != 2)
+                   {
+                        susccessful = false;
+                        Errors.add ("Error in Code line : " + i.toString() + " Invalid number of parameters " + clean_lines[i]);
+                   } 
+                   else if(!isInt(line[1]) && tags[line[1].trim()] == null)
+                   {
+                        susccessful = false;
+                        Errors.add ("Error in Code line : " + i.toString() + " inmediate not valid " + clean_lines[i]);
+                   }
+                   else
+                   { 
+                        if(isInt(line[1].trim()))
+                        {
+                             var instruction = new Binary(32);
+                             var inm = new Binary(26);
+                             inm.from_num(int.parse(line[1]));
+                             instruction.fromString(tipo_J[line[0]] + inm.toStringfill());
+                             binary_exe.add(instruction);
+                        }
+                        else
+                        {
+                             var instruction = new Binary(32);
+                             var inm = new Binary(26);
+                             inm.from_num(tags[line[1]]);
+                             instruction.fromString(tipo_J[line[0]] + inm.toStringfill());
+                             binary_exe.add(instruction);
+                        }
+                   }
+              }
+              else
+              {
+                   susccessful = false;
+                   Errors.add ("Error in Code line : " + i.toString() + " not a instruction " + clean_lines[i]);
+              }
+         }
+    }
     List compile()
     {
-      var Errors = new List<String>() ;
-      bool susceful = true;
-      var instructions = new List<Binary>() ;
+      delete_comentaries();
       
-      List lines = text.split('\n');
+      split_data_and_text();
       
-      var clean_lines = new List<String>();
+      parse_data();
+      
+      int dir_text_bin = binary_exe.length;
+      
+      int desplazamiento_tag = binary_exe.length - dir_text;
+      
+      parse_tags(dir_text, clean_lines.length,desplazamiento_tag);
+      
+      parse_text();
+      
+      binary_exe.add(new Binary(32).from_num(dir_text_bin));
 
-      for(int i = 0; i < lines.length;i++)
+      if(susccessful)
       {
-        lines[i] = lines[i].trim();
-        
-        // Delete commentaries 
-        if (lines[i].split('#')[0] != "")
-        {
-          clean_lines.add(lines[i].split('#')[0]);
-        }
-      }
-      // Chech for tag
-      var tags = new Map();
-      
-      for(int i = 0; i < clean_lines.length;i++)
-      {
-        if(clean_lines[i].startsWith(':'))
-        {
-             if(tags[clean_lines[i].split(' ')[0].replaceAll(new RegExp(":"),'')] != null)
-             {
-                  susceful = false;
-                  Errors.add("Error in Code line : " + i.toString() + " Repeited tag in line " + tags[clean_lines[i].split(' ')[0].replaceAll(new RegExp(":"),'')].toString());
-             }
-             else
-             {
-                    tags[clean_lines[i].split(' ')[0].replaceAll(new RegExp(":"),'')] = i;
-                    // delete inicial tags form code
-                    clean_lines[i] = clean_lines[i].replaceAll(new RegExp(clean_lines[i].split(' ')[0]),'').trim();
-             }
-        }
-      }
-      
-      List bin_instructions = new List<Binary>();
-      
-      for(int i = 0; i < clean_lines.length;i++)
-      {
-        var line = clean_lines[i].split(' ');
-        if (tipo_R[line[0]] != null)
-        {
-          var params = line[1].split(",");
-          if(params.length != 3)
-          {
-            susceful = false;
-            Errors.add ("Error in Code line : " + i.toString() + " Invalid number of registers " + clean_lines[i]);
-          }
-          else if(regs[params[2].trim()] == null ||
-             regs[params[1].trim()] == null ||
-             regs[params[0].trim()] == null)
-          {
-            susceful = false;
-            Errors.add ("Error in Code line : " + i.toString() + " Register not valid " + clean_lines[i]);
-          }
-          else
-          {          
-               var instruction = new Binary(32);
-               
-               instruction.fromString("000000" + regs[params[2].trim()] + 
-                                                 regs[params[1].trim()] + 
-                                                 regs[params[0].trim()] + 
-                                                 tipo_R[line[0]]);
-               instructions.add(instruction);
-          }
-        }
-        else if (tipo_I[line[0]] != null)
-        {
-          var params = line[1].split(",");
-          if(params.length != 3)
-          {
-            susceful = false;
-            Errors.add ("Error in Code line : " + i.toString() + " Invalid number of parameters " + clean_lines[i]);
-          } 
-          else if(regs[params[0].trim()] == null ||
-             regs[params[1].trim()] == null )
-          {
-            susceful = false;
-            Errors.add ("Error in Code line : " + i.toString() + " Register not valid " + clean_lines[i]);
-          }
-          else if(!isInt(params[2].trim()) && tags[params[2].trim()] == null)
-          {
-               susceful = false;
-               Errors.add ("Error in Code line : " + i.toString() + " Tag not valid " + clean_lines[i]);
-          }
-          else
-          {
-               var instruction = new Binary(32);
-               if(!isInt(params[2].trim()))
-               {
-                    var tag = new Binary(16);
-                    tag.from_num(tags[params[2].trim()]);
-                    instruction.fromString(tipo_I[line[0]] +
-                              regs[params[1].trim()] +
-                              regs[params[0].trim()] +
-                              tag.toStringfill());
-               }
-               else
-               {
-                    var inm = new Binary(16);
-                    inm.from_num(int.parse(params[2].trim()));
-                              instruction.fromString(tipo_I[line[0]] +
-                              regs[params[1].trim()] +
-                              regs[params[0].trim()] +
-                              inm.toStringfill());
-               }
-               instructions.add(instruction);
-          }
-        }
-        else if (tipo_J[line[0]] != null)
-        {
-             if(line.length != 2)
-             {
-                  susceful = false;
-                  Errors.add ("Error in Code line : " + i.toString() + " Invalid number of parameters " + clean_lines[i]);
-             } 
-             else if(!isInt(line[1]))
-             {
-                  susceful = false;
-                  Errors.add ("Error in Code line : " + i.toString() + " inmediate not valid " + clean_lines[i]);
-             }
-             else
-             { 
-                  var instruction = new Binary(32);
-                  var inm = new Binary(26);
-                  inm.from_num(int.parse(line[1]));
-                  instruction.fromString(tipo_J[line[0]] + inm.toStringfill());
-                  instructions.add(instruction);
-             }
-        }
-        else
-        {
-          susceful = false;
-          Errors.add ("Error in Code line : " + i.toString() + " not a instruction " + clean_lines[i]);
-        }
-        
-          
-      }
-      if(susceful)
-      {
-           return instructions;
+           return binary_exe;
       }
       else
       {
