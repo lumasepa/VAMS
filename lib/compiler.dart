@@ -20,7 +20,7 @@ class Compiler
                   "mult":"011000",
                   "multu":"011001",
                   "div":"011010",
-                  "divu":"11011",
+                  "divu":"011011",
                   "mfhi":"010000",
                   "mflo":"010010",
                   "and":"100100",
@@ -32,25 +32,32 @@ class Compiler
                   "sll":"000000",
                   "srl":"000010",
                   "sra":"000011",
-                  "jr":"000100" 
+                  "jr":"001000",
+                  "nop":"000000"
     };
     var tipo_I = {
                   "addi":"001000",
                   "addiu":"001001",
-                  "la":"", //Carga la direccion de memoria de una etiqueta
+                  "la":"100010", 
                   "lw":"100011",
                   "lh":"100101",
-                  "lb":"",
-                  "lbu":"",
-                  "sw":"101011",//coincide con una de arriba
-                  "sh":"",//almacena la primera parte de la palabra
+                  "lhu":"100101",
+                  "lb":"100000",
+                  "lbu":"100100",
+                  "sw":"101011",
+                  "sh":"101001",
                   "sb":"101000",
                   "lui":"001111",
                   "andi":"001100",
                   "ori":"001101",
+                  "xori":"001110",
                   "slti":"001010",
-                  "beq":"000100",//4
-                  "bne":"000101"
+                  "sltiu":"001011",
+                  "beq":"000100",
+                  "bne":"000101",
+                  "blez":"000110",//<=0
+                  "bgtz":"000111",//>0
+                  "bltz":"000001",//<0
     };
     
     var tipo_J = {"j":"000010","jal":"000011"};
